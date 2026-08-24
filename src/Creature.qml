@@ -44,7 +44,9 @@ Item {
     readonly property real legH: unit * 0.22
     readonly property real track: Math.max(1, width - unit)   // roam range
 
-    // current horizontal bounds of the visible body, for click hit-testing
+    // current bounds of the visible body along the walk axis (local space;
+    // the whole thing may be rotated onto a vertical edge by the caller),
+    // for click hit-testing
     readonly property real bodyLeft: body.x
     readonly property real bodyRight: body.x + body.width
     property alias bodyX: body.x           // read-write, for drag-to-reposition
@@ -100,32 +102,32 @@ Item {
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
             Behavior on opacity { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
-        // head: logo (tinted) or robot glyph fallback
-        AiIcon {
-            id: head
-            width: root.unit
-            height: root.unit
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: 0
-            aiName: root.aiName
-            tint: root.bodyColor
-            fontFamily: root.fontFamily
-        }
+            // head: logo (tinted) or robot glyph fallback
+            AiIcon {
+                id: head
+                width: root.unit
+                height: root.unit
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 0
+                aiName: root.aiName
+                tint: root.bodyColor
+                fontFamily: root.fontFamily
+            }
 
-        // legs, stepping while moving
-        Rectangle {
-            width: root.unit * 0.14; height: root.legH; radius: width / 2
-            color: root.bodyColor
-            x: body.width * 0.30
-            y: root.unit * 0.9 - root.legH * 0.6 * Math.max(0, Math.sin(body.stepPhase))
+            // legs, stepping while moving
+            Rectangle {
+                width: root.unit * 0.14; height: root.legH; radius: width / 2
+                color: root.bodyColor
+                x: body.width * 0.30
+                y: root.unit * 0.9 - root.legH * 0.6 * Math.max(0, Math.sin(body.stepPhase))
+            }
+            Rectangle {
+                width: root.unit * 0.14; height: root.legH; radius: width / 2
+                color: root.bodyColor
+                x: body.width * 0.56
+                y: root.unit * 0.9 - root.legH * 0.6 * Math.max(0, Math.sin(body.stepPhase + Math.PI))
+            }
         }
-        Rectangle {
-            width: root.unit * 0.14; height: root.legH; radius: width / 2
-            color: root.bodyColor
-            x: body.width * 0.56
-            y: root.unit * 0.9 - root.legH * 0.6 * Math.max(0, Math.sin(body.stepPhase + Math.PI))
-        }
-        }   // end visual
     }
 
     // sleep indicator: a little "z" drifting up while idle (running but not working)

@@ -1,6 +1,6 @@
 # AI Avatar
 
-Little AI avatars that **roam the edge of your screen** — one per AI CLI
+Little AI avatars that **roam the edge of your screen**, one per AI CLI
 that's running (Claude Code, Codex, aider, ollama…). They wander about with
 randomized paths, speeds and pauses, and vanish when their AI stops. Pure
 ambient presence: everywhere except the thin strip each avatar occupies stays
@@ -22,23 +22,23 @@ logos.
 ![avatars](screenshots/avatars.png)
 
 *Claude, Codex, Gemini, and a sleeping Claude (the "z" means its AI is running
-but idle — it stops walking and stands still until there's work to do again).*
+but idle: it stops walking and stands still until there's work to do again).*
 
 ### Moving avatars
 
 Every avatar can be repositioned independently:
 
-- **Drag along its strip** to move it and pin it in place — it stops
+- **Drag along its strip** to move it and pin it in place: it stops
   wandering and stays put until dragged again.
 - **Drag it off the strip** (past its thin band, toward whichever screen edge
-  is nearest) to relocate that one avatar to a different edge entirely — top,
-  bottom, left, or right. It pops and fades slightly once it's "picked up" so
+  is nearest) to relocate that one avatar to a different edge entirely (top,
+  bottom, left, or right). It pops and fades slightly once it's "picked up" so
   it's clear it's about to jump edges, and a small ghost icon follows your
   cursor while you decide where to drop it. On a vertical edge the avatar
   turns 90° and wanders up and down instead of side to side.
 - A plain click (no drag) focuses that AI's window instead.
 
-Positions aren't saved — everything resets to following the bar on restart.
+Positions aren't saved: everything resets to following the bar on restart.
 
 ### Custom AI logos
 
@@ -52,7 +52,7 @@ assets/aider.svg
 ```
 
 The file name must match the process name in your `processes` setting. Monochrome
-SVGs look best — they're tinted to your theme color.
+SVGs look best, since they're tinted to your theme color.
 
 ## Install
 
@@ -61,7 +61,7 @@ omarchy plugin add https://github.com/hlasensky/omarchy-ai-avatar.git --enable
 ```
 
 Plugins land **disabled** until you review them; `--enable` opts in. It drops
-into the bar's right section — move it with
+into the bar's right section; move it with
 `omarchy bar move hl.ai_avatar --section <left|center|right>`.
 
 ## Update
@@ -83,7 +83,7 @@ the plugin from `~/.config/omarchy/plugins/`.
 
 - `pgrep` (from `procps-ng`, ships with Omarchy).
 - A Nerd Font as the bar font (Omarchy default) for the robot fallback glyph.
-- Hyprland (the Omarchy compositor) — avatars live in `wlr-layer-shell`
+- Hyprland (the Omarchy compositor): avatars live in `wlr-layer-shell`
   overlays.
 
 On multi-monitor setups, avatars only appear on one screen (system-wide
@@ -99,7 +99,7 @@ Configure from **Setup → Plugins**, or edit the widget entry in
 |------------------|-------------|------------------------------------------------|---------------------------------------|
 | `processes`      | multiselect | claude, codex, aider, ollama, gemini           | Process names that count as "AI busy" |
 | `pollIntervalMs` | integer     | 1500                                           | How often to check (ms)               |
-| `walkSpeed`      | integer     | 6000                                           | Walk lap duration (ms) — lower = faster |
+| `walkSpeed`      | integer     | 6000                                           | Walk lap duration (ms); lower = faster |
 
 Matching is by **process name** (`pgrep -l`), so merely opening a file that
 mentions an AI name won't trigger it. A CLI launched under a wrapper whose
@@ -107,4 +107,4 @@ process name differs (e.g. `node`) won't match unless you add that name.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

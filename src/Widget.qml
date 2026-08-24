@@ -6,7 +6,7 @@ import Quickshell.Hyprland  // Hyprland.dispatch
 import qs.Ui                // BarWidget
 import qs.Commons           // Style tokens
 
-// The plugin takes no bar space — it spawns a full-screen, click-through
+// The plugin takes no bar space: it spawns a full-screen, click-through
 // overlay where one avatar per running AI wanders about, blows up when its
 // AI stops, bumps on hover, and focuses the AI's window on click. Each
 // avatar can be dragged to its own screen edge independently of the others;
@@ -154,21 +154,16 @@ BarWidget {
     }
     Component.onCompleted: sync()
 
-    // Full-screen, mostly-empty overlay. Nothing here captures input except
-    // the four thin edge bands below, so the rest of the screen stays
-    // click-through -- same footprint as a single docked strip had, just
-    // spread across however many edges currently have an avatar on them.
-    //
     // One thin interactive band per screen edge, each only as big as that
-    // edge's own strip would be -- handles hover/click/drag for whichever
+    // edge's own strip would be: handles hover/click/drag for whichever
     // avatars currently live on that edge. Dragging one along its band
     // repositions and pins it; dragging it *off* the band (toward whichever
     // screen edge is nearest) moves that one avatar to that edge instead. A
     // plain click (no drag either way) focuses its AI's window. Declared as
     // a reusable component (4 fixed instances below, each with a stable id)
-    // rather than a Repeater, so the overlay's mask -- which needs a real,
-    // always-valid item reference, not a Repeater.itemAt() call that may
-    // resolve before the items exist -- can address them directly.
+    // rather than a Repeater, so the overlay's mask below, which needs a
+    // real, always-valid item reference rather than a Repeater.itemAt() call
+    // that may resolve before the items exist, can address them directly.
     component EdgeBand: Item {
         id: band
         required property string edge
@@ -296,6 +291,10 @@ BarWidget {
         }
     }
 
+    // Full-screen, mostly-empty overlay. Nothing here captures input except
+    // the four thin edge bands below, so the rest of the screen stays
+    // click-through: same footprint as a single docked strip had, just
+    // spread across however many edges currently have an avatar on them.
     PanelWindow {
         id: overlay
         visible: root.isPrimaryInstance && avatarModel.count > 0
