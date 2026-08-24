@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "hl.ai_avatar",
+  "name": "AI Avatar",
+  "version": "0.1.0",
+  "author": "hlasensky",
+  "description": "A little creature that lives in your bar and walks around whenever an AI CLI is running, and rests when it's idle.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "src/Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "AI Avatar",
+    "description": "Ambient activity mascot — walks while an AI CLI (claude, codex, aider, ollama…) is running.",
+    "category": "AI",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "processes": ["claude", "codex", "aider", "ollama", "gemini"],
+      "pollIntervalMs": 1500,
+      "walkSpeed": 6000
+    },
+    "schema": [
+      {"key": "processes", "type": "multiselect",
+       "options": ["claude", "codex", "aider", "ollama", "gemini", "cursor", "copilot", "llama", "gpt"],
+       "label": "Processes that mean \"AI is working\""},
+      {"key": "pollIntervalMs", "type": "integer", "min": 500, "max": 5000, "step": 100, "label": "Poll interval (ms)"},
+      {"key": "walkSpeed", "type": "integer", "min": 1000, "max": 12000, "step": 500, "label": "Walk speed (ms per screen width; higher = slower)"}
+    ]
+  }
+}
