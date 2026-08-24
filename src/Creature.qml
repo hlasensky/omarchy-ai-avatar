@@ -1,5 +1,4 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects   // OpacityMask (flat-fill the logo silhouette)
 import qs.Commons                   // Color tokens
 
 // A wandering avatar whose head is the running AI's logo (robot glyph fallback).
@@ -16,7 +15,15 @@ Item {
     property bool hovered: false           // cursor is over this avatar
     property bool active: true             // AI is actively working -> may walk
     property bool pinned: false            // dragged into place -> stop wandering
+    property bool dragging: false          // mouse button currently down, moving it
+    property bool relocating: false        // dragged off the strip -> about to jump to a new edge
+    property bool flipped: true            // true: hang from a bar above; false: stand on a bar below
     signal died()                          // emitted when the blow-up finishes
+
+    // Fades out while a floating drag-ghost (see Widget.qml) stands in for
+    // it under the cursor, so it doesn't look like two avatars at once.
+    opacity: dragging ? 0.35 : 1.0
+    Behavior on opacity { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
     // Per-AI colors (approximate brand hues) for contrast and quick recognition;
     // the logo is tinted to this too. Falls back to the theme accent.
@@ -43,11 +50,13 @@ Item {
 
     // start dragging: freeze wandering in place
     function beginDrag() {
+        root.dragging = true
         xAnim.stop()
         pauseTimer.stop()
     }
     // finish dragging: pin() true if it actually moved, else resume wandering
     function endDrag(pin) {
+        root.dragging = false
         if (pin) {
             root.pinned = true
         } else if (!root.pinned && !root.hovered && !root.dying) {
@@ -55,81 +64,51 @@ Item {
         }
     }
 
-    // --- logo lookup: claude/codex reuse Omarchy's; assets/<name>.svg override ---
-    readonly property var logoCandidates: {
-        if (!aiName) return [];
-        var c = [];
-        var base = "file:///usr/share/omarchy/shell/plugins/agents/assets/";
-        if (aiName === "claude") c.push(base + "claude.svg");
-        if (aiName === "codex")  c.push(base + "codex.svg");
-        c.push(Qt.resolvedUrl("../assets/" + aiName + ".svg"));
-        return c;
-    }
-    property int logoIndex: 0
-    onAiNameChanged: logoIndex = 0
-
     Item {
         id: body
         width: root.unit
         height: root.unit + root.legH * 0.6
-        y: 0                       // pinned to the top of the strip (under the bar)
+        y: root.flipped ? 0 : (root.height - height)   // pinned to the edge touching the bar
         x: 0
 
         property int facing: 1
         property real stepPhase: 0
         readonly property bool moving: xAnim.running
 
-        // Flipped 180° so the avatar hangs from the bar's underside (legs up,
-        // touching the bar); xScale still drives facing so walking stays normal.
+        // Flipped when hanging from a bar above (legs up, touching the bar);
+        // upright when standing on a bar below (legs down, touching the bar).
+        // xScale still drives facing so walking stays normal either way.
         transform: Scale {
             origin.x: body.width / 2
             origin.y: body.height / 2
             xScale: body.facing
-            yScale: -1
+            yScale: root.flipped ? -1 : 1
         }
 
-        // head: logo (tinted) or robot glyph fallback
+        // Purely cosmetic drag-feedback pop, isolated from body's own scale
+        // (already driven by breathing/blow-up/revive) so the two can never
+        // fight over the same property. A plain drag along the strip pops
+        // it up a little; once it's been pulled off toward another edge
+        // (about to relocate on release) it pops further and fades slightly,
+        // so "just repositioning" and "about to jump edges" read differently.
         Item {
+            id: visual
+            anchors.fill: parent
+            scale: root.relocating ? 1.35 : (root.dragging ? 1.15 : 1.0)
+            opacity: root.relocating ? 0.75 : 1.0
+            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
+            Behavior on opacity { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+
+        // head: logo (tinted) or robot glyph fallback
+        AiIcon {
             id: head
             width: root.unit
             height: root.unit
             anchors.horizontalCenter: parent.horizontalCenter
             y: 0
-
-            Image {
-                id: logo
-                anchors.fill: parent
-                source: root.logoIndex < root.logoCandidates.length
-                        ? root.logoCandidates[root.logoIndex] : ""
-                sourceSize.width: root.unit * 2
-                sourceSize.height: root.unit * 2
-                fillMode: Image.PreserveAspectFit
-                visible: false
-                onStatusChanged: if (status === Image.Error
-                        && root.logoIndex < root.logoCandidates.length)
-                    Qt.callLater(function () { root.logoIndex++ })
-            }
-            // flat-fill the logo silhouette with the exact body color (same as legs)
-            Rectangle {
-                id: logoFill
-                anchors.fill: parent
-                color: root.bodyColor
-                visible: false
-            }
-            OpacityMask {
-                anchors.fill: parent
-                source: logoFill
-                maskSource: logo
-                visible: logo.status === Image.Ready
-            }
-            Text {
-                anchors.centerIn: parent
-                visible: logo.status !== Image.Ready
-                text: String.fromCodePoint(0xF06A9)   // nf-md-robot fallback
-                font.family: root.fontFamily
-                font.pixelSize: root.unit
-                color: root.bodyColor
-            }
+            aiName: root.aiName
+            tint: root.bodyColor
+            fontFamily: root.fontFamily
         }
 
         // legs, stepping while moving
@@ -145,6 +124,7 @@ Item {
             x: body.width * 0.56
             y: root.unit * 0.9 - root.legH * 0.6 * Math.max(0, Math.sin(body.stepPhase + Math.PI))
         }
+        }   // end visual
     }
 
     // sleep indicator: a little "z" drifting up while idle (running but not working)
