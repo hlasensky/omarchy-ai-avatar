@@ -181,6 +181,19 @@ BarWidget {
         }
     }
 
+    // `c.aiName` is already sourced from ActivityMonitor's allowlisted
+    // `procList()` by the time it reaches here, so it should only ever be a
+    // plain identifier -- but this builds another regex (for focus.sh) from
+    // it, so it's re-validated at the point of use too rather than trusted
+    // transitively. Keep in sync with ActivityMonitor.qml's allowedProcesses.
+    readonly property var allowedProcesses: [
+        "claude", "codex", "aider", "ollama", "gemini",
+        "opencode", "cursor", "copilot", "llama", "gpt"
+    ]
+    function escapeRegex(s) {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
     // Overlay-absolute cursor position while dragging, and which avatar it's
     // for -- drives the floating drag-ghost below, so the avatar visibly
     // follows the mouse like a normal web drag-and-drop icon instead of
@@ -310,9 +323,9 @@ BarWidget {
                         avatarModel.setProperty(dragIndex, "edge", pendingEdge);
                     } else {
                         c.endDrag(didDrag);
-                        if (!didDrag) {
+                        if (!didDrag && root.allowedProcesses.indexOf(c.aiName) !== -1) {
                             if (focusProc.running) focusProc.running = false;
-                            focusProc.targetPattern = "\\b(" + c.aiName + ")\\b";
+                            focusProc.targetPattern = "\\b(" + root.escapeRegex(c.aiName) + ")\\b";
                             focusProc.running = true;
                         }
                     }
@@ -411,9 +424,15 @@ BarWidget {
     }
 
     // Resolve the clicked AI's window address (focus.sh) and focus it through
-    // Omarchy's Lua-based Hyprland dispatch.
+    // Omarchy's Lua-based Hyprland dispatch. Hyprland.dispatch() only takes a
+    // single raw string (no structured/parameterized form in this Quickshell
+    // version), so `addr` is validated against the exact address grammar
+    // Hyprland itself emits (`0x` + lowercase hex, e.g. `0x555ee22e15a0`)
+    // before it's ever concatenated in -- that closes the injection off by
+    // construction rather than by trusting focus.sh's output.
     readonly property string scriptPath:
         Qt.resolvedUrl("focus.sh").toString().replace(/^file:\/\//, "")
+    readonly property var addressPattern: /^0x[0-9a-f]+$/
 
     Process {
         id: focusProc
@@ -422,7 +441,7 @@ BarWidget {
         stdout: StdioCollector { id: focusOut }
         onExited: function (code, status) {
             var addr = focusOut.text.trim()
-            if (addr.length)
+            if (root.addressPattern.test(addr))
                 Hyprland.dispatch('hl.dsp.focus({ window = "address:' + addr + '" })')
         }
     }

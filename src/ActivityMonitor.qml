@@ -18,19 +18,44 @@ Item {
     property var  busyNames: []        // running AND recently using CPU
     property var  _busyUntil: ({})     // name -> timestamp while considered busy
 
+    // `processes` is a plugin setting -- it lives in shell.json, which is
+    // plain JSON a user (or a bug elsewhere) can put anything into, not just
+    // what the settings UI offers. It flows straight into a regex passed to
+    // pgrep and, later, into a Hyprland dispatch string (see Widget.qml), so
+    // it's re-validated here against the exact set the manifest actually
+    // ships rather than trusted as-is. Keep this in sync with
+    // manifest.json's `schema[0].options`.
+    readonly property var allowedProcesses: [
+        "claude", "codex", "aider", "ollama", "gemini",
+        "opencode", "cursor", "copilot", "llama", "gpt"
+    ]
+    readonly property int maxProcesses: 10   // matches allowedProcesses.length; a fixed cap, not derived, so it can't grow silently
+
+    function escapeRegex(s) {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    // Every name this returns is guaranteed to be one of allowedProcesses --
+    // callers (including Widget.qml, for the focus-on-click dispatch) can
+    // treat anything sourced from here as a safe, plain identifier.
     function procList() {
         var raw = processes, out = [];
-        if (typeof raw === "string") { if (raw.length) out.push(raw); }
-        else if (raw && raw.length !== undefined) {
-            for (var i = 0; i < raw.length; i++) out.push(String(raw[i]));
+        if (typeof raw === "string") raw = raw.length ? [raw] : [];
+        else if (!raw || raw.length === undefined) raw = [];
+        for (var i = 0; i < raw.length && out.length < monitor.maxProcesses; i++) {
+            var name = String(raw[i]);
+            if (monitor.allowedProcesses.indexOf(name) !== -1 && out.indexOf(name) === -1)
+                out.push(name);
         }
         return out;
     }
 
     readonly property string pattern: {
         var list = procList();
-        return list.length ? "\\b(" + list.join("|") + ")\\b"
-                           : "\\b__hl_ai_avatar_no_match__\\b";
+        if (!list.length) return "\\b__hl_ai_avatar_no_match__\\b";
+        var escaped = [];
+        for (var i = 0; i < list.length; i++) escaped.push(monitor.escapeRegex(list[i]));
+        return "\\b(" + escaped.join("|") + ")\\b";
     }
 
     readonly property string scriptPath:
