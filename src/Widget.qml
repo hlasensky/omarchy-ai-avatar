@@ -125,6 +125,47 @@ BarWidget {
         if (root.hoverName === n) root.hoverName = "";
     }
 
+    // Hit-testing and mouse-coordinate math, all in overlay-absolute space.
+    // The four edge bands physically overlap by a barSize square in each
+    // corner (a top-edge avatar and a left-edge avatar can both visually sit
+    // in the top-left corner), and only one band's MouseArea -- whichever
+    // was declared last -- actually receives clicks there. So hit-testing
+    // can never filter by "this band's own edge": it has to check every
+    // avatar's real position regardless of which band the event arrived
+    // through, or an avatar parked in a corner becomes unclickable.
+    function avatarRect(c) {
+        var e = c.effectiveEdge;
+        if (root.isVerticalEdge(e)) {
+            var x0 = root.bandOffsetX(e);
+            return { x0: x0, x1: x0 + root.barSize, y0: c.bodyLeft, y1: c.bodyRight };
+        }
+        var y0 = root.bandOffsetY(e);
+        return { x0: c.bodyLeft, x1: c.bodyRight, y0: y0, y1: y0 + root.barSize };
+    }
+    function avatarAtAbsolute(ax, ay) {
+        // scan top of the z-stack down, so overlapping avatars resolve to
+        // whichever is actually drawn on top
+        for (var i = avatars.count - 1; i >= 0; i--) {
+            var c = avatars.itemAt(i);
+            if (!c || c.dying) continue;
+            var r = root.avatarRect(c);
+            if (ax >= r.x0 && ax <= r.x1 && ay >= r.y0 && ay <= r.y1) return i;
+        }
+        return -1;
+    }
+    function nameAtAbsolute(ax, ay) {
+        var i = root.avatarAtAbsolute(ax, ay);
+        return i >= 0 ? avatarModel.get(i).name : "";
+    }
+    // The walk-axis coordinate a given edge would see for an absolute point.
+    function walkCoordForEdge(edge, ax, ay) { return root.isVerticalEdge(edge) ? ay : ax; }
+    // How far an absolute point sits from that edge's own thin band, in the
+    // perpendicular (thickness) direction -- used to arm relocation once an
+    // avatar's been dragged far enough off its actual edge.
+    function perpForEdge(edge, ax, ay) {
+        return root.isVerticalEdge(edge) ? (ax - root.bandOffsetX(edge)) : (ay - root.bandOffsetY(edge));
+    }
+
     // Per-AI colors, matching Creature's own -- duplicated here (rather than
     // exposed from Creature) since the drag-ghost below needs one before any
     // Creature instance is necessarily on screen to ask.
@@ -174,29 +215,15 @@ BarWidget {
         width: vert ? root.barSize : root.bandLength(edge)
         height: vert ? root.bandLength(edge) : root.barSize
 
-        function avatarAtHere(walk) {
-            // scan top of the z-stack down, so overlapping avatars
-            // resolve to whichever is actually drawn on top
-            for (var i = avatars.count - 1; i >= 0; i--) {
-                var c = avatars.itemAt(i);
-                if (c && !c.dying && c.effectiveEdge === band.edge
-                        && walk >= c.bodyLeft && walk <= c.bodyRight) return i;
-            }
-            return -1;
-        }
-        function nameAtHere(walk) {
-            var i = avatarAtHere(walk);
-            return i >= 0 ? avatarModel.get(i).name : "";
-        }
-        // The coordinate along the walk axis, in this band's own frame.
-        function walkCoord(mouse) { return vert ? mouse.y : mouse.x; }
-        // This band's mouse point, translated into overlay-absolute
-        // screen coordinates -- needed to tell which real screen
-        // edge is nearest while dragging an avatar off this band.
+        // This band's mouse point, translated into overlay-absolute screen
+        // coordinates -- every hit-test and drag computation works in this
+        // space so it stays correct regardless of which band's MouseArea
+        // actually received the event (see the comment on avatarRect above).
+        function absPoint(mouse) { return { x: band.x + mouse.x, y: band.y + mouse.y }; }
         function nearestEdge(mouse) {
-            var ax = band.x + mouse.x, ay = band.y + mouse.y;
-            var dTop = ay, dBottom = overlay.height - ay;
-            var dLeft = ax, dRight = overlay.width - ax;
+            var a = band.absPoint(mouse);
+            var dTop = a.y, dBottom = overlay.height - a.y;
+            var dLeft = a.x, dRight = overlay.width - a.x;
             var m = Math.min(dTop, dBottom, dLeft, dRight);
             if (m === dTop) return "top";
             if (m === dBottom) return "bottom";
@@ -222,12 +249,17 @@ BarWidget {
                          : (root.hoverName.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor)
 
             onPositionChanged: function (mouse) {
+                var a = band.absPoint(mouse);
                 if (dragIndex >= 0) {
                     var c = avatars.itemAt(dragIndex);
                     if (c) {
-                        root.dragCursorX = band.x + mouse.x;
-                        root.dragCursorY = band.y + mouse.y;
-                        var perp = band.vert ? mouse.x : mouse.y;
+                        root.dragCursorX = a.x;
+                        root.dragCursorY = a.y;
+                        // Perp/walk are computed against the DRAGGED avatar's
+                        // own edge, not this band's -- they can differ once a
+                        // corner-parked avatar was picked up via a neighboring
+                        // band's MouseArea (see avatarRect's comment above).
+                        var perp = root.perpForEdge(c.effectiveEdge, a.x, a.y);
                         if (perp < -relocateThreshold || perp > root.barSize + relocateThreshold) {
                             relocating = true;
                             pendingEdge = band.nearestEdge(mouse);
@@ -237,7 +269,7 @@ BarWidget {
                         }
                         c.relocating = relocating;
                         if (!relocating) {
-                            var walk = band.walkCoord(mouse);
+                            var walk = root.walkCoordForEdge(c.effectiveEdge, a.x, a.y);
                             var dw = walk - dragStartWalk;
                             if (!didDrag && Math.abs(dw) > dragThreshold) didDrag = true;
                             if (didDrag)
@@ -246,11 +278,12 @@ BarWidget {
                     }
                     return;
                 }
-                root.hoverName = band.nameAtHere(band.walkCoord(mouse));
+                root.hoverName = root.nameAtAbsolute(a.x, a.y);
             }
             onExited: if (dragIndex < 0) root.hoverName = "";
             onPressed: function (mouse) {
-                var i = band.avatarAtHere(band.walkCoord(mouse));
+                var a = band.absPoint(mouse);
+                var i = root.avatarAtAbsolute(a.x, a.y);
                 if (i < 0) return;
                 var c = avatars.itemAt(i);
                 if (!c || c.dying) return;
@@ -258,15 +291,16 @@ BarWidget {
                 didDrag = false;
                 relocating = false;
                 pendingEdge = "";
-                dragStartWalk = band.walkCoord(mouse);
+                dragStartWalk = root.walkCoordForEdge(c.effectiveEdge, a.x, a.y);
                 dragStartBodyX = c.bodyX;
                 root.draggingIndex = i;
-                root.dragCursorX = band.x + mouse.x;
-                root.dragCursorY = band.y + mouse.y;
+                root.dragCursorX = a.x;
+                root.dragCursorY = a.y;
                 c.beginDrag();
             }
             onReleased: function (mouse) {
                 if (dragIndex < 0) return;
+                var a = band.absPoint(mouse);
                 var c = avatars.itemAt(dragIndex);
                 root.draggingIndex = -1;
                 if (c) {
@@ -286,7 +320,7 @@ BarWidget {
                 dragIndex = -1;
                 relocating = false;
                 pendingEdge = "";
-                root.hoverName = band.nameAtHere(band.walkCoord(mouse));
+                root.hoverName = root.nameAtAbsolute(a.x, a.y);
             }
         }
     }

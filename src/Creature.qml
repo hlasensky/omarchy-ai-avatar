@@ -130,7 +130,12 @@ Item {
         }
     }
 
-    // sleep indicator: a little "z" drifting up while idle (running but not working)
+    // sleep indicator: a little "z" drifting away from the bar while idle
+    // (running but not working). Where "the head" and "away from the bar"
+    // actually are flips with `flipped` -- when hanging from a bar above,
+    // the head ends up toward larger y and away means drifting further
+    // down; when standing on a bar below, the head is toward smaller y and
+    // away means drifting further up.
     Text {
         id: sleepZ
         visible: !root.active && !root.dying && !root.hovered
@@ -141,7 +146,8 @@ Item {
         color: root.bodyColor
         x: body.x + body.width * 0.62
         property real drift: 0
-        y: root.height * 0.15 + drift      // start near the head, drift downward
+        readonly property real awayDir: root.flipped ? 1 : -1
+        y: (root.flipped ? root.height * 0.85 : root.height * 0.15) + awayDir * drift
         opacity: 0
 
         SequentialAnimation {
@@ -198,14 +204,6 @@ Item {
         target: body; property: "stepPhase"
         from: 0; to: 2 * Math.PI; duration: 560
         loops: Animation.Infinite; running: body.moving && !root.dying
-    }
-
-    // gentle breathe while resting (frozen while dying or hovered)
-    SequentialAnimation {
-        running: !body.moving && !root.dying && !root.hovered
-        loops: Animation.Infinite
-        NumberAnimation { target: body; property: "scale"; from: 1.0; to: 1.06; duration: 1200; easing.type: Easing.InOutSine }
-        NumberAnimation { target: body; property: "scale"; from: 1.06; to: 1.0; duration: 1200; easing.type: Easing.InOutSine }
     }
 
     // hover: stop and blink
