@@ -250,7 +250,8 @@ BarWidget {
             hoverEnabled: true
 
             property int dragIndex: -1       // avatar index currently under the mouse button
-            property bool didDrag: false     // walk-axis drag exceeded the threshold
+            property bool dragArmed: false   // true once the pick-up delay has elapsed
+            property bool didDrag: false     // walk-axis drag exceeded the threshold (only tracked once armed)
             property bool relocating: false  // dragged off the band -> armed to relocate
             property string pendingEdge: ""  // edge that'll be targeted if released now
             property real dragStartWalk: 0
@@ -258,12 +259,39 @@ BarWidget {
             readonly property real dragThreshold: 4
             readonly property real relocateThreshold: 40   // how far off the band counts as "picked up"
 
-            cursorShape: dragIndex >= 0 ? Qt.ClosedHandCursor
+            // A short press-and-hold before an avatar is actually "picked
+            // up" -- a quick press-release still reads as a plain click
+            // (focuses the window) even if the cursor drifts a little during
+            // it, and only a deliberate hold engages dragging.
+            Timer {
+                id: pickupTimer
+                interval: 300
+                repeat: false
+                onTriggered: {
+                    if (bandMouse.dragIndex < 0) return;
+                    var c = avatars.itemAt(bandMouse.dragIndex);
+                    if (!c) return;
+                    bandMouse.dragArmed = true;
+                    // Re-anchor to wherever the cursor actually is now (it
+                    // may have drifted during the wait) so pick-up doesn't
+                    // snap the avatar to a stale press-time position.
+                    var a = band.absPoint({ x: bandMouse.mouseX, y: bandMouse.mouseY });
+                    bandMouse.dragStartWalk = root.walkCoordForEdge(c.effectiveEdge, a.x, a.y);
+                    bandMouse.dragStartBodyX = c.bodyX;
+                    root.draggingIndex = bandMouse.dragIndex;
+                    root.dragCursorX = a.x;
+                    root.dragCursorY = a.y;
+                    c.beginDrag();
+                }
+            }
+
+            cursorShape: dragArmed ? Qt.ClosedHandCursor
                          : (root.hoverName.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor)
 
             onPositionChanged: function (mouse) {
                 var a = band.absPoint(mouse);
                 if (dragIndex >= 0) {
+                    if (!dragArmed) return;   // still in the pick-up delay; avatar stays put
                     var c = avatars.itemAt(dragIndex);
                     if (c) {
                         root.dragCursorX = a.x;
@@ -301,20 +329,28 @@ BarWidget {
                 var c = avatars.itemAt(i);
                 if (!c || c.dying) return;
                 dragIndex = i;
+                dragArmed = false;
                 didDrag = false;
                 relocating = false;
                 pendingEdge = "";
-                dragStartWalk = root.walkCoordForEdge(c.effectiveEdge, a.x, a.y);
-                dragStartBodyX = c.bodyX;
-                root.draggingIndex = i;
-                root.dragCursorX = a.x;
-                root.dragCursorY = a.y;
-                c.beginDrag();
+                pickupTimer.restart();
             }
             onReleased: function (mouse) {
                 if (dragIndex < 0) return;
+                pickupTimer.stop();
                 var a = band.absPoint(mouse);
                 var c = avatars.itemAt(dragIndex);
+                if (!dragArmed) {
+                    // released before the pick-up delay elapsed -- a plain click
+                    if (c && root.allowedProcesses.indexOf(c.aiName) !== -1) {
+                        if (focusProc.running) focusProc.running = false;
+                        focusProc.targetPattern = "\\b(" + root.escapeRegex(c.aiName) + ")\\b";
+                        focusProc.running = true;
+                    }
+                    dragIndex = -1;
+                    dragArmed = false;
+                    return;
+                }
                 root.draggingIndex = -1;
                 if (c) {
                     c.relocating = false;
@@ -331,6 +367,7 @@ BarWidget {
                     }
                 }
                 dragIndex = -1;
+                dragArmed = false;
                 relocating = false;
                 pendingEdge = "";
                 root.hoverName = root.nameAtAbsolute(a.x, a.y);
