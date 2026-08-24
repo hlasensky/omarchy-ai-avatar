@@ -34,6 +34,7 @@ Item {
         case "gemini": return "#4285F4";   // Google blue
         case "ollama": return "#E6E6E6";   // light grey
         case "aider":  return "#C678DD";   // purple
+        case "opencode": return "#FFD60A"; // amber (no certain official hex -- just distinct)
         default:       return Color.accent;
         }
     }

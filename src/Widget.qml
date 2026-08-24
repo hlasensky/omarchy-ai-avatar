@@ -135,6 +135,7 @@ BarWidget {
         case "gemini": return "#4285F4";
         case "ollama": return "#E6E6E6";
         case "aider":  return "#C678DD";
+        case "opencode": return "#FFD60A";
         default:       return Color.accent;
         }
     }
