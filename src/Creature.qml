@@ -15,6 +15,7 @@ Item {
     property bool dying: false             // set when its AI stopped -> blow up
     property bool hovered: false           // cursor is over this avatar
     property bool active: true             // AI is actively working -> may walk
+    property bool pinned: false            // dragged into place -> stop wandering
     signal died()                          // emitted when the blow-up finishes
 
     // Per-AI colors (approximate brand hues) for contrast and quick recognition;
@@ -31,13 +32,28 @@ Item {
     }
     property color bodyColor: colorFor(aiName)
 
-    readonly property real unit: Math.min(height, 22)
+    readonly property real unit: Math.min(height, 18)
     readonly property real legH: unit * 0.22
     readonly property real track: Math.max(1, width - unit)   // roam range
 
     // current horizontal bounds of the visible body, for click hit-testing
     readonly property real bodyLeft: body.x
     readonly property real bodyRight: body.x + body.width
+    property alias bodyX: body.x           // read-write, for drag-to-reposition
+
+    // start dragging: freeze wandering in place
+    function beginDrag() {
+        xAnim.stop()
+        pauseTimer.stop()
+    }
+    // finish dragging: pin() true if it actually moved, else resume wandering
+    function endDrag(pin) {
+        if (pin) {
+            root.pinned = true
+        } else if (!root.pinned && !root.hovered && !root.dying) {
+            Qt.callLater(nextStep)
+        }
+    }
 
     // --- logo lookup: claude/codex reuse Omarchy's; assets/<name>.svg override ---
     readonly property var logoCandidates: {
@@ -178,7 +194,7 @@ Item {
     }
 
     function nextStep() {
-        if (root.hovered || root.dying || !root.active) return   // frozen / idle
+        if (root.hovered || root.dying || !root.active || root.pinned) return   // frozen / idle / pinned
         if (root.track <= 1) { pauseTimer.interval = 400; pauseTimer.restart(); return }
         // wander LOCALLY: step a short random distance from where we are, so it
         // ambles about instead of flying the full screen width end to end.
@@ -223,7 +239,7 @@ Item {
             pauseTimer.stop()
         } else if (!dying) {
             body.opacity = 1        // clear any mid-blink opacity
-            if (!xAnim.running && !pauseTimer.running) Qt.callLater(nextStep)
+            if (!pinned && !xAnim.running && !pauseTimer.running) Qt.callLater(nextStep)
         }
     }
 
@@ -232,7 +248,7 @@ Item {
         if (!active) {
             xAnim.stop()
             pauseTimer.stop()
-        } else if (!hovered && !dying) {
+        } else if (!hovered && !dying && !pinned) {
             if (!xAnim.running && !pauseTimer.running) Qt.callLater(nextStep)
         }
     }
@@ -269,6 +285,15 @@ Item {
         xAnim.stop()
         pauseTimer.stop()
         blowUp.start()
+    } else if (blowUp.running) {
+        // revived mid-explosion (AI reappeared before the animation finished)
+        blowUp.stop()
+        body.scale = 1
+        body.opacity = 1
+        body.rotation = 0
+        blast.opacity = 0
+        blast.scale = 0.4
+        if (!hovered) Qt.callLater(nextStep)
     }
 
     Component.onCompleted: {

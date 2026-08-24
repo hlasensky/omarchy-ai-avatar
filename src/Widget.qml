@@ -20,10 +20,24 @@ BarWidget {
     implicitWidth: 0            // no footprint in the bar row
     implicitHeight: barSize
 
-    property int hoverIndex: -1
+    property string hoverName: ""
+
+    // Omarchy's bar (and every enabled bar widget, including this one) is
+    // instantiated once per connected monitor, but ActivityMonitor polls
+    // system-wide processes -- so without this guard every AI would get one
+    // avatar per screen. Only the instance hosted on the first-listed screen
+    // actually polls and renders; the rest stay fully inert.
+    readonly property string myScreenName:
+        root.QsWindow && root.QsWindow.window && root.QsWindow.window.screen
+            ? String(root.QsWindow.window.screen.name || "") : ""
+    readonly property string primaryScreenName:
+        Quickshell.screens.length > 0 ? String(Quickshell.screens[0].name || "") : ""
+    readonly property bool isPrimaryInstance:
+        myScreenName !== "" && myScreenName === primaryScreenName
 
     ActivityMonitor {
         id: monitor
+        active: root.isPrimaryInstance
         processes: root.processes
         pollIntervalMs: root.pollIntervalMs
     }
@@ -61,13 +75,20 @@ BarWidget {
     function removeByName(n) {
         var i = indexOfName(n);
         if (i >= 0) avatarModel.remove(i);
+        if (root.hoverName === n) root.hoverName = "";
     }
     function avatarAt(px) {
-        for (var i = 0; i < avatars.count; i++) {
+        // scan top of the z-stack down, so overlapping avatars resolve to
+        // whichever one is actually drawn on top (last model index paints last)
+        for (var i = avatars.count - 1; i >= 0; i--) {
             var c = avatars.itemAt(i);
             if (c && !c.dying && px >= c.bodyLeft && px <= c.bodyRight) return i;
         }
         return -1;
+    }
+    function nameAt(px) {
+        var i = avatarAt(px);
+        return i >= 0 ? avatarModel.get(i).name : "";
     }
 
     Connections {
@@ -78,7 +99,7 @@ BarWidget {
 
     PanelWindow {
         id: strip
-        visible: avatarModel.count > 0
+        visible: root.isPrimaryInstance && avatarModel.count > 0
         anchors { top: true; left: true; right: true }
         implicitHeight: root.barSize
         margins.top: root.barSize          // sit directly under the bar
@@ -97,7 +118,7 @@ BarWidget {
                 height: strip.height
                 aiName: model.name
                 dying: model.dying
-                hovered: index === root.hoverIndex
+                hovered: model.name === root.hoverName
                 active: monitor.busyNames.indexOf(model.name) !== -1   // walk only while working
                 walkSpeed: root.walkSpeed
                 fontFamily: root.bar ? root.bar.fontFamily : ""
@@ -105,20 +126,60 @@ BarWidget {
             }
         }
 
-        // Hover bumps the avatar under the cursor; click focuses its AI's window.
+        // Hover bumps the avatar under the cursor; drag repositions and pins it;
+        // a plain click (no drag) focuses its AI's window.
         MouseArea {
+            id: interact
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: root.hoverIndex >= 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onPositionChanged: function (mouse) { root.hoverIndex = root.avatarAt(mouse.x) }
-            onExited: root.hoverIndex = -1
-            onClicked: function (mouse) {
+
+            property int dragIndex: -1       // avatar index currently under the mouse button
+            property bool didDrag: false     // moved past the threshold this press
+            property real dragStartMouseX: 0
+            property real dragStartBodyX: 0
+            readonly property real dragThreshold: 4
+
+            cursorShape: dragIndex >= 0 ? Qt.ClosedHandCursor
+                         : (root.hoverName.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor)
+
+            onPositionChanged: function (mouse) {
+                if (dragIndex >= 0) {
+                    var c = avatars.itemAt(dragIndex);
+                    if (c) {
+                        var dx = mouse.x - dragStartMouseX;
+                        if (!didDrag && Math.abs(dx) > dragThreshold) didDrag = true;
+                        if (didDrag)
+                            c.bodyX = Math.max(0, Math.min(c.track, dragStartBodyX + dx));
+                    }
+                    return;
+                }
+                root.hoverName = root.nameAt(mouse.x);
+            }
+            onExited: if (dragIndex < 0) root.hoverName = "";
+            onPressed: function (mouse) {
                 var i = root.avatarAt(mouse.x);
                 if (i < 0) return;
                 var c = avatars.itemAt(i);
-                if (!c) return;
-                focusProc.targetPattern = "\\b(" + c.aiName + ")\\b";
-                focusProc.running = true;
+                if (!c || c.dying) return;
+                dragIndex = i;
+                didDrag = false;
+                dragStartMouseX = mouse.x;
+                dragStartBodyX = c.bodyX;
+                c.beginDrag();
+            }
+            onReleased: function (mouse) {
+                if (dragIndex < 0) return;
+                var c = avatars.itemAt(dragIndex);
+                if (c) {
+                    c.endDrag(didDrag);
+                    if (!didDrag) {
+                        if (focusProc.running) focusProc.running = false;
+                        focusProc.targetPattern = "\\b(" + c.aiName + ")\\b";
+                        focusProc.running = true;
+                    }
+                }
+                dragIndex = -1;
+                root.hoverName = root.nameAt(mouse.x);
             }
         }
     }

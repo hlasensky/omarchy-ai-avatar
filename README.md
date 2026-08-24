@@ -72,7 +72,7 @@ Configure from **Setup → Plugins**, or edit the widget entry in
 |------------------|-------------|------------------------------------------------|---------------------------------------|
 | `processes`      | multiselect | claude, codex, aider, ollama, gemini           | Process names that count as "AI busy" |
 | `pollIntervalMs` | integer     | 1500                                           | How often to check (ms)               |
-| `walkSpeed`      | integer     | 1600                                           | Walk lap duration (ms) — lower = faster |
+| `walkSpeed`      | integer     | 6000                                           | Walk lap duration (ms) — lower = faster |
 
 Matching is by **process name** (`pgrep -l`), so merely opening a file that
 mentions an AI name won't trigger it. A CLI launched under a wrapper whose

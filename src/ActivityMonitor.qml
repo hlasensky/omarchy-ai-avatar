@@ -8,6 +8,7 @@ import Quickshell.Io
 Item {
     id: monitor
 
+    property bool active: true         // set false to stay fully inert (no polling)
     property var  processes: ["claude", "codex", "aider", "ollama", "gemini"]
     property int  pollIntervalMs: 1500
     property int  busyThreshold: 3     // cpu jiffies over the sample = "working"
@@ -74,9 +75,9 @@ Item {
     Timer {
         interval: monitor.pollIntervalMs
         repeat: true
-        running: true
+        running: monitor.active
         onTriggered: if (!probe.running) probe.running = true
     }
 
-    Component.onCompleted: probe.running = true
+    Component.onCompleted: if (monitor.active) probe.running = true
 }
