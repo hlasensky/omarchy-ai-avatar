@@ -22,18 +22,21 @@ BarWidget {
 
     property string hoverName: ""
 
-    // Omarchy's bar (and every enabled bar widget, including this one) is
-    // instantiated once per connected monitor, but ActivityMonitor polls
-    // system-wide processes -- so without this guard every AI would get one
-    // avatar per screen. Only the instance hosted on the first-listed screen
-    // actually polls and renders; the rest stay fully inert.
+    // Omarchy's bar (and every enabled bar widget, including this one) runs
+    // once per connected monitor, but ActivityMonitor polls system-wide
+    // processes -- so unguarded, every AI would get one avatar per screen.
+    // `bar` (base BarWidget property) turns out to be the single shared
+    // outer Bar object, not the per-monitor BarPanel window -- no `screen`
+    // on it. Walk up the actual window ancestor instead via the QsWindow
+    // attached property, which reflects the real per-monitor BarPanel this
+    // widget instance is physically hosted inside.
     readonly property string myScreenName:
         root.QsWindow && root.QsWindow.window && root.QsWindow.window.screen
             ? String(root.QsWindow.window.screen.name || "") : ""
     readonly property string primaryScreenName:
         Quickshell.screens.length > 0 ? String(Quickshell.screens[0].name || "") : ""
     readonly property bool isPrimaryInstance:
-        myScreenName !== "" && myScreenName === primaryScreenName
+        myScreenName === "" || myScreenName === primaryScreenName
 
     ActivityMonitor {
         id: monitor
