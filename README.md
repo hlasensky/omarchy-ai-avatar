@@ -19,6 +19,11 @@ theme, so it matches every theme), with drawn legs; it falls back to a robot
 glyph for any AI without a logo. Claude and Codex reuse Omarchy's own shipped
 logos.
 
+![avatars](screenshots/avatars.png)
+
+*Claude, Codex, Gemini, and a sleeping Claude (the "z" means its AI is running
+but idle — it stops walking and stands still until there's work to do again).*
+
 ### Moving avatars
 
 Every avatar can be repositioned independently:

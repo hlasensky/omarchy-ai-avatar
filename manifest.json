@@ -4,14 +4,14 @@
   "name": "AI Avatar",
   "version": "0.1.0",
   "author": "hlasensky",
-  "description": "A little creature that lives on your screen edge and walks around whenever an AI CLI is running, rests when it's idle, and can be dragged to any edge of the screen.",
+  "description": "A little creatures that live on your screen edge: walks while its AI is actively working, stands and naps (zzz) when it's idle, and pops when it stops. Click it to jump to that AI's window; drag it to reposition or move it to any edge of the screen.",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "src/Widget.qml"
   },
   "barWidget": {
     "displayName": "AI Avatar",
-    "description": "Ambient activity mascot — walks while an AI CLI (claude, codex, aider, ollama…) is running.",
+    "description": "Ambient activity mascot: walks while its AI is busy, naps when idle, pops when it stops. Click to focus that AI's window.",
     "category": "AI",
     "allowMultiple": false,
     "defaultSection": "right",
